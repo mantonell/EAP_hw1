@@ -3,35 +3,43 @@ clc; clear;
 %% DATA PROCESSING
 
 % Load the data from the .xlsx file. We only need the data concerning the
-% return R, the interest rate, and the consumption process. Notice that,
-% while the interest rates and consumptions time series are complete, the
-% return R time series lacks the first 3 entries. For this reason, we
-% delete the first 3 rows from the dataset.
-data = xlsread('DataQ4798.xlsx','B:K');
-data = data(4:end,:);
+% return R, the interest rate, and the consumption process.
 
-% Return series.
-R = data(:,3); R = R+1;
-% Interest rate series.
-ir = data(:,5); ir = ir./100 + 1;
-% Consumption series.
-cons = data(:,9);
+% The returns series.
+R = xlsread('DataQ4798.xlsx','D:D'); 
+R = R+1;
+% The risk-free returns series.
+Rf = xlsread('DataQ4798.xlsx','F:F'); 
+Rf = Rf./100+1;
+% The consumptions series.
+C = xlsread('DataQ4798.xlsx','J:J');
+C_growth = C(2:end)./C(1:end-1);
 
-clear('data');
+% All vectors must have the same size.
+T = min([length(R),length(Rf),length(C_growth)]);
+R = R(end-T+1:end);
+Rf = Rf(end-T+1:end);
+C_growth = C_growth(end-T+1:end);
 
-% Consumption rate = C(t+1)/C(t).
-c_rate = cons(2:end)./cons(1:end-1);
-% Deletion of the first component of R and ir, in order to have all vectors
-% of the same length.
-R = R(2:end); ir = ir(2:end);
+% Deletion of useless variables.
+clear('C');
 
-% Sample size.
-T = length(c_rate);
+%% INSTRUMENTS CHOICE
 
-clear('cons');
+% I consider the instrument vector [1 R(t-1)...R(t-L) Rf(t-1)...Rf(t-L)], 
+% where L is the number of lags, and can be set arbitrarily.
+L = 50;
+% Instrument matrix definition.
+z = ones(2*L+1,T-L);
+for k=1:L
+    z(1+k,:) = R(L+1-k:end-k);
+    z(1+L+k,:) = Rf(L+1-k:end-k);
+end
 
-%% INSTRUMENT CHOICE & FUNCTION DEFINITION
-% I adopt as instrument the vector [1; R(t-1); ir(t-1)].
-nlags = 1; % number of lags used.
-theta0 = [.5,10]; % starting point for the fminsearch function.
-GMM_Lucas(T,c_rate,R,ir,nlags,theta0)
+%% FIRST STEP OF THE GMM ALGORITHM: IDENTITY MATRIX
+
+% Starting point for the fminsearch routine.
+theta0 = [.8,100];
+options = optimset('MaxFunEvals',600);
+[theta, fval] = ...
+    fminsearch(@(theta) J(theta,T,R,Rf,C_growth,z), theta0, options);

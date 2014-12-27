@@ -1,28 +1,20 @@
-function ret = J(theta, T, c_rate, R, ir, nlags, W)
+function ret = J(theta,T,R,Rf,C_growth,z)
 
 % theta = [beta, gamma] is the vector of the parameters of the Lucas model.
-% nlags = number of lags in the instrument vector.
-% W = the matrix to be used in the computation of the quadratic form.
+% z = the instrument matrix.
 
-g = 0;
-
-% Instrument matrix definition.
-z = ones(2*nlags+1,T-nlags);
-for j = 1:nlags
-    z(1+j,:) = R(nlags+1-j:end-j);
-    z(1+nlags+j,:) = ir(nlags+1-j:end-j);
-end
-
+g_T = 0;
+L = T-length(z); % number of lags considered.
 
 % Loop
-for t = nlags+1:T
-    e = [theta(1) * c_rate(t).^(-theta(2)) * R(t); theta(1) * c_rate(t).^(-theta(2)) * ir(t)];
+for t = L+1:T
+    e = [theta(1) * C_growth(t).^(-theta(2)) * R(t); ...
+        theta(1) * C_growth(t).^(-theta(2)) * Rf(t)];
     e = e-1;
-    g = g + kron(e,z(:,t-nlags));
+    g_T = g_T + kron(e,z(:,t-L));
 end
 
-g = g./(T-nlags);
-
-ret = g'*W*g;
+g_T = g_T./(T-L);
+ret = g_T'*eye(2*(2*L+1))*g_T;
 
 return ;
